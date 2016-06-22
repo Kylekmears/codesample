@@ -16,13 +16,18 @@ import os
 from Bio import SeqIO
 from Bio.Blast import NCBIWWW, NCBIXML
 
-def blast_to_database(in_file, out_database, e_cutoff = 0.001):
+def blast_to_database(in_file, out_database):
     '''Runs NCBI BLAST query against nr and stores results in an sqlite database'''
 
     for index, fasta_sequence in enumerate(SeqIO.parse(in_file, 'fasta')):
+
         print('Blasting sequence', index + 1)
-        blast_record = NCBIXML.parse(NCBIWWW.qblast('blastn', 'nr', fasta_sequence.seq))
+        blast_record = [seq for seq in NCBIXML.parse(NCBIWWW.qblast('blastn', 'nr', fasta_sequence.seq))]
         out_file  = open('result' + str(index) + '.txt','w')
+        record_copy = blast_record
+
+        if len(blast_record) == 0:
+            print('No results found')
 
         for blast_result in blast_record:
             print('blast_record: ', blast_record, type(blast_record))
@@ -41,7 +46,7 @@ def make_database(out_database):
         db = connection.cursor()
 
         db.execute("""
-                   create table 
+                   CREATE table if not exists
                    summary(title TEXT,
                            run_id INTEGER, 
                            num_hits INTEGER,
@@ -51,7 +56,7 @@ def make_database(out_database):
                    """)
 
         db.execute("""
-                   create table
+                   CREATE table if not exists
                    results(description TEXT,
                            run_id INTEGER,
                            percent_id REAL,
@@ -66,6 +71,34 @@ def make_database(out_database):
     except Exception as e:
         print('raised' + e + 'when trying to connect to database')
 
+def send_to_database(out_database, blast_result):
+    '''Takes in biopython Bio.Blast.Record.Blast object and
+       sends important results to database'''
+    
+    connection = sqlite3.connect(out_database)
+    db = connection.cursor()
+
+    db.execute("""
+               INSERT into summary
+               (title,
+                run_id,
+                num_hits,
+                length,
+                best_hit,
+                best_hit_score)
+               values(VALUES)
+               """)
+
+    db.execute("""
+               INSERT into results
+               (description,
+                run_id,
+                percent_id,
+                length,
+                e_value,
+                sequence)
+               values(VALUES)
+               """)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -93,13 +126,9 @@ def main():
         out_db = args.output
     else:
         out_db = "blast_results.db"
-
-    if args.e_value:
-        e_cutoff = args.e_value
-    else:
-        e_cutoff = 0.001
-
-    blast_to_database(args.input, out_db, e_cutoff)
+    
+    make_database(out_db)
+    blast_to_database(args.input, out_db)
         
     if args.verbose:
         print('Verbose')
