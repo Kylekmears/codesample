@@ -32,16 +32,16 @@ def blast_to_database(in_file, out_database):
 
         for record in range(len(blast_record.descriptions)):
 
-            top_percent = 0
-            sum_len = 0
-            sum_id = 0
+            top_ID_percent = 0
+            sum_len_align = 0
+            sum_identity = 0
 
             for hsp in blast_record.alignments[record].hsps:
-                sum_id += hsp.identities
-                sum_len += hsp.align_length
+                sum_identity += hsp.identities
+                sum_len_align += hsp.align_length
                 hsp_percent = (hsp.identities/hsp.align_length)*100
                 if hsp_percent > top_percent:
-                    top_percent = hsp_percent
+                    top_ID_percent = hsp_percent
 
             description = blast_record.descriptions[record].title
             percent_id_top_HSP = top_percent
@@ -55,14 +55,14 @@ def blast_to_database(in_file, out_database):
             result = [description, run_id, percent_id_top_HSP,
                       percent_id_all_HSP, e_val, date]
             result_to_database(out_database, result)
-
-        num_hits = len(blast_record.descriptions)
-        if num_hits == 0:
-            print('No results found')
             
         summary = [summary_title, run_id, num_hits, best_hit, best_hit_score,
                    date]
         summary_to_database(out_database, summary)
+
+        num_hits = len(blast_record.descriptions)
+        if num_hits == 0:
+            print('No results found')
 
 def make_database(out_database):
     try:
