@@ -3,6 +3,11 @@
 # In a virtualenv, run "pip install -r requirements.txt" before
 # running this code
 
+# This code results in two tables:
+# summary, which contains title, run id, num hits, best hit, best hit score
+# and results, containing description, run id, percent id for top HSP,
+# percent id for all HSPs, and e val
+
 import argparse
 import sqlite3
 import os
