@@ -22,22 +22,45 @@ def blast_to_database(in_file, out_database):
     for index, fasta_sequence in enumerate(SeqIO.parse(in_file, 'fasta')):
 
         print('Blasting sequence', index + 1)
-        blast_record = [seq for seq in NCBIXML.parse(NCBIWWW.qblast('blastn', 'nr', fasta_sequence.seq))]
-        out_file  = open('result' + str(index) + '.txt','w')
-        record_copy = blast_record
+        blast_record = NCBIXML.read(NCBIWWW.qblast('blastn', 'nr', fasta_sequence.seq))
 
-        if len(blast_record) == 0:
+        summary_title = fasta_sequence.description
+        run_id = fasta_sequence.id
+        best_hit = None
+        best_hit_score = 100
+
+        for record in range(len(blast_record.descriptions)):
+            print(blast_record.descriptions[record].title)
+
+            top_percent = 0
+            sum_len = 0
+            sum_id = 0
+
+            for hsp in blast_record.alignments[record].hsps:
+                sum_id += hsp.identities
+                sum_len += hsp.align_length
+                hsp_percent = (hsp.identities/hsp.align_length)*100
+                if hsp_percent > top_percent:
+                    top_percent = hsp_percent
+
+            description = blast_record.descriptions[record].title
+            percent_id_top_HSP = top_percent
+            percent_id_all_HSP = (sum_id/sum_len)*100
+            e_val = blast_record.descriptions[record].e
+
+            if best_hit_score > e_val:
+                best_hit_score = e_val
+                best_hit = description
+            
+            result = [description, run_id, percent_id_top_HSP, percent_id_all_HSP, e_val]
+            result_to_database(out_database, result)
+
+        num_hits = len(blast_record.descriptions)
+        if num_hits == 0:
             print('No results found')
-
-        for blast_result in blast_record:
-            print('blast_record: ', blast_record, type(blast_record))
-            print('blast_result', blast_result, type(blast_result))
-            out_file.write('')
-            # sequence = blast_result.alignments.hsps.strand (?), description = blast_result.descriptions.title (or maybe .score), 
-            # percent ID = ?, and E-value = blast_result.descriptions.e
-            print([(i.num_alignments, type(i.num_alignments)) for i in blast_result.descriptions])
-            # So here is what's happening: seq_record = sequence to be blasted
-            # blast_record = generator that contains sequence.  sequence = blast object
+            
+        summary = [summary_title, run_id, num_hits, best_hit, best_hit_score]
+        summary_to_database(out_database, summary)
 
 def make_database(out_database):
 
@@ -48,21 +71,19 @@ def make_database(out_database):
         db.execute("""
                    CREATE table if not exists
                    summary(title TEXT,
-                           run_id INTEGER, 
+                           run_id TEXT, 
                            num_hits INTEGER,
-                           length INTEGER,
-                           best_hit TEXT,
-                           best_hit_score REAL)
+                           top_hit TEXT,
+                           top_hit_e_value REAL)
                    """)
 
         db.execute("""
                    CREATE table if not exists
                    results(description TEXT,
-                           run_id INTEGER,
-                           percent_id REAL,
-                           length INTEGER,
-                           e_value REAL,
-                           sequence TEXT)
+                           run_id TEXT,
+                           percent_id_top_HSP REAL,
+                           percent_id_all_HSP REAL,
+                           e_value REAL)
                    """)
 
 
@@ -71,36 +92,42 @@ def make_database(out_database):
     except Exception as e:
         print('raised' + e + 'when trying to connect to database')
 
-def send_to_database(out_database, blast_result):
-    '''Takes in biopython Bio.Blast.Record.Blast object and
-       sends important results to database'''
-    
+# Split in two - summary_to_database and results_to_database
+def summary_to_database(out_database, summary):
+    '''Takes in summary list and sends data to database
+        summary = [title, run id, num hits, best hit, best hit score]'''
+
     connection = sqlite3.connect(out_database)
     db = connection.cursor()
 
     db.execute("""
                INSERT into summary
-               (title,
-                run_id,
-                num_hits,
-                length,
-                best_hit,
-                best_hit_score)
-               values(VALUES)
-               """)
+               (title, run_id, num_hits, best_hit, best_hit_score)
+               values
+               ({}, {}, {}, {}, {})
+               """).format(summary[0], summary[1], summary[2]
+                           summary[3], summary[4])
 
+    connection.commit()
+
+def result_to_database(out_database, result):
+    '''takes in results list and adds data to results table
+       result = [description, run id, percent id top HSP, percent id all HSP, e val]'''
+
+    connection = sqlite3.connect(out_database)
+    db = connection.cursor()
     db.execute("""
                INSERT into results
-               (description,
-                run_id,
-                percent_id,
-                length,
-                e_value,
-                sequence)
-               values(VALUES)
-               """)
+               (description, run_id, percent_id_top_HSP, 
+                percent_id_all_HSP, e_value)
+               values({}, {}, {}, {}, {})
+               """).format(result[0], result[1], result[2],
+                           result[3], result[4])
+
+    connection.commit()
 
 def main():
+
     parser = argparse.ArgumentParser()
     group = parser.add_mutually_exclusive_group()
     
@@ -108,19 +135,8 @@ def main():
                         DNA sequences", type = str)
     parser.add_argument("-o", "--output", help =
                         "Specify path to output database", type = str)
-    parser.add_argument("-e", "--e_value", help =
-                        "e-value cut-off. default = 0.001", type = float)
 
-    group.add_argument("-v","--verbose", action ="store_true")
-    group.add_argument("-q","--quiet", action ="store_true")
-    
     args = parser.parse_args()
-
-#    for seq_record in SeqIO.parse(args.input, 'fasta'):
-#        print(seq_record.id)
-#        print(repr(seq_record.seq))
-#        print(len(seq_record))
-#        print(seq_record.description)
 
     if args.output:
         out_db = args.output
@@ -129,11 +145,6 @@ def main():
     
     make_database(out_db)
     blast_to_database(args.input, out_db)
-        
-    if args.verbose:
-        print('Verbose')
-    elif args.quiet:
-        print('shh')
         
 if __name__ == "__main__":
     main()
