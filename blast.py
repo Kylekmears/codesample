@@ -45,7 +45,7 @@ def blast_to_database(in_file, out_database):
 
             description = blast_record.descriptions[record].title
             percent_id_top_HSP = top_percent
-            percent_id_all_HSP = (sum_id/sum_len)*100
+            percent_id_all_HSP = (sum_identity/sum_len_align)*100
             e_val = blast_record.descriptions[record].e
 
             if best_hit_score > e_val:
