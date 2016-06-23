@@ -3,13 +3,6 @@
 # In a virtualenv, run "pip install -r requirements.txt" before
 # running this code
 
-# TO DO: 
-# 1) Figure out how to get sequence, description, percent ID, and E-value
-#    from blast_record
-# 2) Add e_value cutoff for NCBIWWW.qblast
-# 3) Create sqlite database and add these to the database
-# 4) Refactor so B_T_D is blast (returns xml) and xml_to_database
-
 import argparse
 import sqlite3
 import os
@@ -18,13 +11,14 @@ from Bio.Blast import NCBIWWW, NCBIXML
 from datetime import datetime
 
 def blast_to_database(in_file, out_database):
-    '''Runs NCBI BLAST query against nr and stores results in an sqlite database'''
+    '''Runs NCBI BLAST query against nr. Stores results in an sqlite database'''
 
     for index, fasta_sequence in enumerate(SeqIO.parse(in_file, 'fasta')):
 
         print('Blasting sequence', index + 1)
         date = str(datetime.now())
-        blast_record = NCBIXML.read(NCBIWWW.qblast('blastn', 'nr', fasta_sequence.seq))
+        blast_record = NCBIXML.read(NCBIWWW.qblast('blastn', 'nr',
+                                                   fasta_sequence.seq))
 
         summary_title = fasta_sequence.description
         run_id = fasta_sequence.id
@@ -53,18 +47,19 @@ def blast_to_database(in_file, out_database):
                 best_hit_score = e_val
                 best_hit = description
             
-            result = [description, run_id, percent_id_top_HSP, percent_id_all_HSP, e_val, date]
+            result = [description, run_id, percent_id_top_HSP,
+                      percent_id_all_HSP, e_val, date]
             result_to_database(out_database, result)
 
         num_hits = len(blast_record.descriptions)
         if num_hits == 0:
             print('No results found')
             
-        summary = [summary_title, run_id, num_hits, best_hit, best_hit_score, date]
+        summary = [summary_title, run_id, num_hits, best_hit, best_hit_score,
+                   date]
         summary_to_database(out_database, summary)
 
 def make_database(out_database):
-
     try:
         connection = sqlite3.connect(out_database)
         db = connection.cursor()
@@ -88,8 +83,7 @@ def make_database(out_database):
                            e_value REAL,
                            date TEXT)
                    """)
-
-
+        
         connection.commit()
 
     except Exception as e:
@@ -114,7 +108,8 @@ def summary_to_database(out_database, summary):
 
 def result_to_database(out_database, result):
     '''takes in results list and adds data to results table
-       result = [description, run id, percent id top HSP, percent id all HSP, e val]'''
+       result = [description, run id, percent id top HSP,
+       percent id all HSP, e val]'''
 
     connection = sqlite3.connect(out_database)
     db = connection.cursor()
