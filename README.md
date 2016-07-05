@@ -6,15 +6,18 @@ _____________________________________
 usage: blast.py [-h] [-o OUTPUT] input
 
 positional arguments:
-  input                 Path to fasta-format file containing DNA sequences.
+  input                 
+  
+  Path to fasta-format file containing DNA sequences.
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help            
+  
+show this help message and exit
   
   -o OUTPUT, --output OUTPUT
   
-                        Specify path to output database (directories in path
-                        must already exist)
+Specify path to output database (directories in path must already exist)
 
 _________________________________________
 This code results in a database with two tables:
